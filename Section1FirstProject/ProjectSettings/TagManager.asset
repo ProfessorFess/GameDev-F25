@@ -8,6 +8,11 @@ TagManager:
   - Enemy_Barrier
   - Enemy
   - Collectable
+  - Deck
+  - Waste
+  - Foundation
+  - Tableau
+  - Card
   layers:
   - Default
   - TransparentFX
