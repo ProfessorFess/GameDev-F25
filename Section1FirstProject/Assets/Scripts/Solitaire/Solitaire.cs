@@ -140,6 +140,10 @@ public class Solitaire : MonoBehaviour
         }
 
         // need to reset x position for all cards not in the drawn set of 3
+        foreach (Transform child in wastePosition.transform)
+        {
+            child.transform.position = new Vector3(wastePosition.transform.position.x, child.transform.position.y, child.transform.position.z);
+        }
         int cardsToDraw = Math.Min(3, deck.Count);
         for (int i = 0; i < cardsToDraw; i++)
         {
@@ -206,7 +210,7 @@ public class Solitaire : MonoBehaviour
                     Debug.Log("Blocked from tab->tab/foundation");
                     return false;
                 }
-                Debug.Log("can place on found from tab: " + CanPlaceOnFoundation(cardObject.name, tabIndex));
+                Debug.Log("can place on found from tab: " + CanPlaceOnFoundation(cardObject.name, foundationIndex));
                 return CanPlaceOnFoundation(cardObject.name, foundationIndex);
             }
             Debug.Log("Bad tab to tab/found click");
@@ -216,17 +220,71 @@ public class Solitaire : MonoBehaviour
         return false;
     }
 
+    public void MoveCardsAbove(GameObject origParent, int originalTabIndex, int destTabIndex, int cardsToMoveCount, GameObject clickedTag, GameObject cardObject)
+    {
+        if (originalTabIndex == -1 || cardsToMoveCount <= 1) return;
+        List<string> origTab = tableaus[originalTabIndex];
+        int origCount = origTab.Count;
+        int origIndex = origCount - cardsToMoveCount + 1;
+        for (int i = 0; i < cardsToMoveCount -1 ; i++)
+        {
+            string movingCardName = origTab[origIndex];
+            origTab.RemoveAt(origIndex);
+            tableaus[destTabIndex].Add(movingCardName);
+            GameObject movingCardObj = null;
+            foreach (Transform child in origParent.transform)
+            {
+                if (child.gameObject.name == movingCardName)
+                {
+                    movingCardObj = child.gameObject;
+                    break;
+                }
+            }
+            if(movingCardObj!=null)
+            {
+                movingCardObj.transform.parent = clickedTag.transform;
+                movingCardObj.transform.position = cardObject.transform.position + (cardOffset * (i + 1));
+            }
+        }
+    }
+    
     public void PlaceCard(GameObject cardObject, GameObject targetObject)
     {
         if (cardObject == targetObject || cardObject == null || targetObject == null) return;
+        int originalTabIndex = -1;
+        int cardsToMoveCount = 1;
         ResolveTarget(targetObject, out GameObject clickedTag, out int foundationIndex, out int tabIndex);
+        GameObject originalParent = cardObject.transform.parent.gameObject;
         // if coming from tab, need to remove card and all cards on top of it from their original tab
+        if (cardObject.transform.parent.CompareTag("Tableau"))
+        {
+            foreach (List<string> tableau in tableaus)
+            {
+                if (tableau.Contains(cardObject.name))
+                {
+                    originalTabIndex = System.Array.IndexOf(tableaus, tableau);
+                    cardsToMoveCount = tableau.Count - tableau.IndexOf(cardObject.name);
+                    tableau.Remove(cardObject.name);
+                    break;
+                }
+            }
+        }
 
         if (cardObject.transform.parent.CompareTag("Waste"))
         {
             waste.Remove(cardObject.name);
         }
         // if coming from foundation, remove card from correct foundation
+        if (cardObject.transform.parent.CompareTag("Foundation"))
+        {
+            foreach (List<string> foundation in foundations)
+            {
+                if (foundation.Contains(cardObject.name))
+                {
+                    foundation.Remove(cardObject.name);
+                }
+            }
+        }
 
         // if moving to tab, add the card to the correct tab
         if (clickedTag.transform.CompareTag("Tableau"))
@@ -242,8 +300,16 @@ public class Solitaire : MonoBehaviour
             // update parent
             cardObject.transform.parent = clickedTag.transform;
             // move all other cards on top of the original cardObject (probably put this in a helper function)
+            MoveCardsAbove(originalParent, originalTabIndex, tableauIndex, cardsToMoveCount, clickedTag, cardObject);
         }
         // if moving to foundation, add card to correct foundation
+        if (clickedTag.transform.CompareTag("Foundation"))
+        {
+            int fIndex = System.Array.IndexOf(foundationPositions, clickedTag);
+            foundations[fIndex].Add(cardObject.name);
+            cardObject.transform.position = targetObject.transform.position + new Vector3(0f, 0f, -.03f);
+            cardObject.transform.parent = clickedTag.transform;
+        }
     }
 
     public bool IsLastInTab(GameObject cardObject)
@@ -291,7 +357,9 @@ public class Solitaire : MonoBehaviour
         if (card1 == null || card2 == null) return false;
         int rank1 = Array.IndexOf(ranks, card1.Substring(1));
         int rank2 = Array.IndexOf(ranks, card2.Substring(1));
-        return rank1 == rank2 + 1;
+        Debug.Log("rank1: " + rank1);
+        Debug.Log("rank2: " + rank2);
+        return rank1 == (rank2 + 1) % ranks.Length;
     }
 
     public bool IsOneRankLower(string card1, string card2)
@@ -299,7 +367,7 @@ public class Solitaire : MonoBehaviour
         if (card1 == null || card2 == null) return false;
         int rank1 = Array.IndexOf(ranks, card1.Substring(1));
         int rank2 = Array.IndexOf(ranks, card2.Substring(1));
-        return rank1 + 1 == rank2;
+        return (rank1 + 1) % ranks.Length == rank2;
     }
 
     public bool CanPlaceOnFoundation(string card, int foundationIndex)
@@ -309,6 +377,9 @@ public class Solitaire : MonoBehaviour
             return card.Substring(1) == "A";
         }
         string topCard = foundations[foundationIndex].Last();
+        Debug.Log("topCard: " + topCard + ", card: " + card);
+        Debug.Log("IsSameSuit: " + IsSameSuit(card, topCard));
+        Debug.Log("IsOneRankHigher: " + IsOneRankHigher(card, topCard));
         return IsSameSuit(card, topCard) && IsOneRankHigher(card, topCard);
     }
 

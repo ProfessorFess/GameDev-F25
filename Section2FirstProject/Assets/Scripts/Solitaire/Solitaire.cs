@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
 using UnityEngine;
 
 public class Solitaire : MonoBehaviour
@@ -105,11 +104,55 @@ public class Solitaire : MonoBehaviour
         return false;
     }
 
+    public void MoveStackedCards(GameObject originalParent, int originalTabIndex, int destTabIndex, int cardsToMoveCount, GameObject clickedTag, GameObject cardObject)
+    {
+        if (originalTabIndex == -1 || cardsToMoveCount <= 1) return;
+        List<string> originalTab = tableaus[originalTabIndex];
+        int origCount = originalTab.Count;
+        int origIndex = origCount - cardsToMoveCount + 1;
+        for (int i=0; i < cardsToMoveCount -1; i++)
+        {
+            string moveCard = originalTab[originalTabIndex];
+            originalTab.RemoveAt(origIndex);
+            tableaus[destTabIndex].Add(moveCard);
+            GameObject moveCardObject = null;
+            foreach (Transform child in originalParent.transform)
+            {
+                if (child.gameObject.name == moveCard)
+                {
+                    moveCardObject = child.gameObject;
+                    break;
+                }
+            }
+            if (moveCardObject != null)
+            {
+                moveCardObject.transform.parent = clickedTag.transform;
+                moveCardObject.transform.position = cardObject.transform.position + (cardOffset * (i + 1));
+            }
+        }
+    }
+
     public void PlaceCard(GameObject fromLocation, GameObject toLocation)
     {
         if (fromLocation == null || toLocation == null) return;
         ResolveTarget(toLocation, out GameObject clickedTag, out int foundationIndex, out int tabIndex);
+        int originalTabIndex = -1;
+        int cardsToMoveCount = 1;
+        GameObject originalParent = fromLocation.transform.parent.gameObject;
         // if coming from tab, need to remove card and all cards on top of it from their original tab
+        if (fromLocation.transform.parent.CompareTag("Tableau"))
+        {
+            foreach(List<string> tableau in tableaus)
+            {
+                if (tableau.Contains(fromLocation.name))
+                {
+                    originalTabIndex = System.Array.IndexOf(tableaus, tableau);
+                    cardsToMoveCount = tableau.Count - tableau.IndexOf(fromLocation.name);
+                    tableau.Remove(fromLocation.name);
+                    break;
+                }
+            }
+        }
 
         // if coming from waste, need to remove card from waste
         if (fromLocation.transform.parent.CompareTag("Waste"))
@@ -118,6 +161,18 @@ public class Solitaire : MonoBehaviour
         }
 
         // if coming from foundation, remove card from correct foundation
+        if (fromLocation.transform.parent.CompareTag("Foundation"))
+        {
+            foreach(List<string> foundation in foundations)
+            {
+                if (foundation.Contains(fromLocation.name))
+                {
+                    foundation.Remove(fromLocation.name);
+                    break;
+                }
+            }
+        }
+        
 
         // if moving to tab, add the card to the correct tab
         if (clickedTag.transform.CompareTag("Tableau"))
@@ -134,8 +189,17 @@ public class Solitaire : MonoBehaviour
             {
                 fromLocation.transform.position = toLocation.transform.position + cardOffset;
             }
+            MoveStackedCards(originalParent, originalTabIndex, tabIndex, cardsToMoveCount, clickedTag, fromLocation);
         }
         // move all other cards on top of the original cardObject (probably put this in a helper function)
+
+        // if moving to foundation, add card to correct foundation
+        if (clickedTag.transform.CompareTag("Foundation"))
+        {
+            int fIndex = System.Array.IndexOf(foundationPositions, clickedTag.transform.gameObject);
+            foundations[fIndex].Add(fromLocation.name);
+            fromLocation.transform.position = toLocation.transform.position + new Vector3(0f, 0f, -.1f);
+        }
 
         // update parent
         fromLocation.transform.parent = clickedTag.transform;
@@ -212,6 +276,12 @@ public class Solitaire : MonoBehaviour
             }
             return;
         }
+
+        foreach(Transform child in wastePosition.transform)
+        {
+            child.position = new Vector3(wastePosition.transform.position.x, child.position.y, child.position.z);
+        }
+
         int cardsToDraw = Mathf.Min(3, deck.Count);
         Vector3 currentPosition = wastePosition.transform.position + new Vector3(0, 0, zoffset);
         for (int i = 0; i < cardsToDraw; i++)
