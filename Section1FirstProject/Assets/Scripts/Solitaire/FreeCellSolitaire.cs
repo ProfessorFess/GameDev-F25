@@ -274,6 +274,14 @@ Debug.Log(
             foundations[foundationIndex].Add(cardName);
             cardObject.transform.position = clickedTag.transform.position + new Vector3(0f, 0f, -0.03f);
             cardObject.transform.parent = clickedTag.transform;
+
+            // Ensure the newest card in the foundation renders on top
+            SpriteRenderer sr = cardObject.GetComponent<SpriteRenderer>();
+            if (sr != null)
+            {
+                sr.sortingOrder = foundations[foundationIndex].Count;
+            }
+
             CheckForWin();
         }
         else if (clickedTag.CompareTag("FreeCell"))
@@ -321,6 +329,60 @@ Debug.Log(
             totalCardsInFoundations += foundation.Count;
         }
         return totalCardsInFoundations == 52;
+    }
+
+
+    // ------------------ RESTART / NEW GAME ------------------ //
+
+    public void RestartGame()
+    {
+        // Destroy all card GameObjects in the scene
+        GameObject[] allCards = GameObject.FindGameObjectsWithTag("Card");
+        foreach (GameObject card in allCards)
+        {
+            Destroy(card);
+        }
+
+        // Clear logical state
+        if (deck != null)
+        {
+            deck.Clear();
+        }
+
+        if (tableaus != null)
+        {
+            foreach (List<string> tab in tableaus)
+            {
+                tab.Clear();
+            }
+        }
+
+        if (foundations != null)
+        {
+            foreach (List<string> foundation in foundations)
+            {
+                foundation.Clear();
+            }
+        }
+
+        // Clear freecell tracking array (even though we don't rely on it anymore)
+        if (freeCells != null)
+        {
+            for (int i = 0; i < freeCells.Length; i++)
+            {
+                freeCells[i] = null;
+            }
+        }
+
+        // Reset win state and hide win panel
+        gameWon = false;
+        if (winPanel != null)
+        {
+            winPanel.SetActive(false);
+        }
+
+        // Deal a fresh game
+        PlayGame();
     }
 
     // ------------------ HELPERS ------------------ //
