@@ -14,6 +14,7 @@ public class Solitaire : MonoBehaviour
     public GameObject[] foundationPositions;
     public GameObject[] tableauPositions;
     public GameObject deckPosition;
+    public GameObject[] freeCellPositions;
     public GameObject wastePosition;
     public List<string> deck;
     public List<string> waste;

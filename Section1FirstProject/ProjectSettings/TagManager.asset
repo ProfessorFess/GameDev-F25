@@ -13,6 +13,7 @@ TagManager:
   - Foundation
   - Tableau
   - Card
+  - FreeCell
   layers:
   - Default
   - TransparentFX
