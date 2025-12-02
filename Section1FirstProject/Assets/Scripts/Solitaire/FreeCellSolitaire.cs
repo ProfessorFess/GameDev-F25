@@ -12,6 +12,10 @@ public class FreeCellSolitaire : MonoBehaviour
     public Sprite[] cardFaces;
     public Sprite cardBack; // not really used in FreeCell, but kept for compatibility
 
+    [Header("Theme / Background")]
+    public Sprite[] backgroundSprites;           // Different background options
+    public SpriteRenderer backgroundRenderer;    // The renderer to apply the background sprite to
+
     public GameObject[] foundationPositions;  // size 4
     public GameObject[] tableauPositions;     // size 8
     public GameObject[] freeCellPositions;    // size 4
@@ -41,6 +45,7 @@ public class FreeCellSolitaire : MonoBehaviour
 
     private System.Random rng = new System.Random();
     private Vector3 cardOffset = new Vector3(0f, -0.3f, -0.1f);
+    private float moveDuration = 0.3f; // duration for smooth card movement
     private bool gameWon = false;
 
     void Start()
@@ -52,6 +57,7 @@ public class FreeCellSolitaire : MonoBehaviour
         };
         foundations = new List<string>[] { foundation0, foundation1, foundation2, foundation3 };
 
+        ApplyTheme();
         PlayGame();
     }
 
@@ -250,30 +256,35 @@ Debug.Log(
         {
             tableaus[tabIndex].Add(cardName);
 
+            Vector3 targetPos;
+
             // Position card: place below the top card in that tableau
             if (clickedTag == targetObject) // clicked empty tableau space
             {
                 if (tableaus[tabIndex].Count == 1)
                 {
-                    cardObject.transform.position = targetObject.transform.position + new Vector3(0f, 0f, -0.03f);
+                    targetPos = targetObject.transform.position + new Vector3(0f, 0f, -0.03f);
                 }
                 else
                 {
-                    cardObject.transform.position = targetObject.transform.position + cardOffset * (tableaus[tabIndex].Count - 1);
+                    targetPos = targetObject.transform.position + cardOffset * (tableaus[tabIndex].Count - 1);
                 }
             }
             else // clicked on top card in that tableau
             {
-                cardObject.transform.position = targetObject.transform.position + cardOffset;
+                targetPos = targetObject.transform.position + cardOffset;
             }
 
             cardObject.transform.parent = clickedTag.transform;
+            MoveCardSmoothly(cardObject, targetPos);
         }
         else if (clickedTag.CompareTag("Foundation") && foundationIndex >= 0)
         {
             foundations[foundationIndex].Add(cardName);
-            cardObject.transform.position = clickedTag.transform.position + new Vector3(0f, 0f, -0.03f);
+
+            Vector3 targetPos = clickedTag.transform.position + new Vector3(0f, 0f, -0.03f);
             cardObject.transform.parent = clickedTag.transform;
+            MoveCardSmoothly(cardObject, targetPos);
 
             // Ensure the newest card in the foundation renders on top
             SpriteRenderer sr = cardObject.GetComponent<SpriteRenderer>();
@@ -287,8 +298,9 @@ Debug.Log(
         else if (clickedTag.CompareTag("FreeCell"))
         {
             // Just move the card into this FreeCell; we rely on transform.childCount in IsValidMove
-            cardObject.transform.position = clickedTag.transform.position + new Vector3(0f, 0f, -0.03f);
+            Vector3 targetPos = clickedTag.transform.position + new Vector3(0f, 0f, -0.03f);
             cardObject.transform.parent = clickedTag.transform;
+            MoveCardSmoothly(cardObject, targetPos);
         }
         else
         {
@@ -331,6 +343,69 @@ Debug.Log(
         return totalCardsInFoundations == 52;
     }
 
+    // ------------------ THEME APPLICATION ------------------ //
+
+    private void ApplyTheme()
+    {
+        if (backgroundRenderer == null || backgroundSprites == null || backgroundSprites.Length == 0)
+            return;
+
+        int index = MainMenu.selectedThemeIndex;
+
+        if (index < 0 || index >= backgroundSprites.Length)
+        {
+            index = 0;
+        }
+
+        backgroundRenderer.sprite = backgroundSprites[index];
+    }
+
+    // ------------------ ANIMATION HELPERS ------------------ //
+
+    private void MoveCardSmoothly(GameObject cardObject, Vector3 targetPosition)
+    {
+        StartCoroutine(MoveCardCoroutine(cardObject, targetPosition));
+    }
+
+    private System.Collections.IEnumerator MoveCardCoroutine(GameObject cardObject, Vector3 targetPosition)
+    {
+        if (cardObject == null) yield break;
+
+        Debug.Log("MoveCardCoroutine started for " + cardObject.name);
+
+        Vector3 startPos = cardObject.transform.position;
+        Vector3 startScale = cardObject.transform.localScale;
+        Vector3 peakScale = startScale * 1.1f; // slight pop
+        float elapsed = 0f;
+
+        while (elapsed < moveDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / moveDuration);
+
+            // Smooth step for nicer easing
+            float smoothT = t * t * (3f - 2f * t);
+
+            cardObject.transform.position = Vector3.Lerp(startPos, targetPosition, smoothT);
+
+            // Scale up then back down during motion (little "pop" effect)
+            if (t < 0.5f)
+            {
+                float s = t / 0.5f;
+                cardObject.transform.localScale = Vector3.Lerp(startScale, peakScale, s);
+            }
+            else
+            {
+                float s = (t - 0.5f) / 0.5f;
+                cardObject.transform.localScale = Vector3.Lerp(peakScale, startScale, s);
+            }
+
+            yield return null;
+        }
+
+        cardObject.transform.position = targetPosition;
+        cardObject.transform.localScale = startScale;
+    }
 
     // ------------------ RESTART / NEW GAME ------------------ //
 
